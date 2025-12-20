@@ -6,6 +6,7 @@ get_player_stats <- function(season = "2025-2026"){
   library(readxl)
   library(tidyverse)
   library(rvest)
+  library(janitor)
   
   # will sequentially load in and tidy all of the relevant stats pages from
   # fbref for fpl. Start with playing time, which will be used as base
@@ -39,7 +40,16 @@ get_player_stats <- function(season = "2025-2026"){
       as.numeric(`Min`))) |>
     # and select columns we care about
     select(c(Player, Squad, MP, Min, `Mn/MP`, `Min%`, `90s`, `Starts`, `Mn/Start`, `Compl`,
-             `Subs`, `Mn/Sub`))
+             `Subs`, `Mn/Sub`)) |>
+    # filter out NA mins
+    filter(!is.na(`Min`))
+  
+  # want to find and remove duplicates - will remove row from duplicates with least mins
+  # (for now)
+  play_time_stats_dupes |>
+    get_dupes(Player)
+  
+  
   
   # define url for standard stats
   standard_url <- paste0(
@@ -174,7 +184,7 @@ get_player_stats <- function(season = "2025-2026"){
     # and select columns we want
     select(c(Player, Recov))
   
-  # define url for misc stats
+  # define url for adv_gk stats
   adv_gk_url <- paste0(
     "https://fbref.com/en/comps/9/", season, "/keepersadv/", season, "-",
     "Premier-League-Stats"
@@ -239,8 +249,8 @@ get_player_stats <- function(season = "2025-2026"){
   
   # remove first row which is not needed
   sca_stats <- sca_stats[-1, ] |>
-    # and drop columns we don't need - Rk, Nation, Pos, Squad, Age, Born, 90s
-    select(-c(Rk, `Nation`, Pos, Squad, Age, Born, `90s`))
+    # and select columns of interest
+    select(c(Player, `SCA90`))
   
   # define url for possession stats
   possess_url <- paste0(
@@ -264,18 +274,19 @@ get_player_stats <- function(season = "2025-2026"){
   
   # remove first row
   possess_stats <- possess_stats[-1, ] |>
-    # and drop columns we don't need - Rk, Nation, Pos, Squad, Age, Born, 90s
-    select(-c(Rk, `Nation`, Pos, Squad, Age, Born, `90s`))
+    # and select columns of interest
+    select(c(`Player`, `Succ`))
   
   # now join everything to play_time_stats
-  all_stats <- play_time_stats |>
-    full_join(standard_stats) |>
-    full_join(passing_stats) |>
-    full_join(def_act_stats) |>
-    full_join(misc_stats) |>
-    full_join(adv_gk_stats) |>
-    full_join(sca_stats) |>
-    full_join(possess_stats)
+  all_stats <- play_time_stats |> View()
+    #left_join(standard_stats, by = join_by(`Player` == `Player`)) #|> 
+    #left_join(passing_stats) |>
+    #left_join(def_act_stats) |>
+    #left_join(sca_stats) |>
+    
+    #left_join(possess_stats) |>
+    #left_join(misc_stats)# |>
+    #left_join(adv_gk_stats)
   
   return(all_stats)
   
