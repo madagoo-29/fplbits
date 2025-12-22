@@ -1,4 +1,4 @@
-# write function that loads in all latest data and creates one tibble
+# write function that loads in all latest player data and creates one tibble
 
 get_player_stats <- function(season = "2025-2026"){
   
@@ -27,8 +27,14 @@ get_player_stats <- function(season = "2025-2026"){
   
   # now extract player play_time stats
   play_time_stats <- play_time_tables[[3]]
+  
+  # use first row as the column headers
   colnames(play_time_stats) <- play_time_stats[1, ]
+  
+  # rename column 29
   colnames(play_time_stats)[29] <- "xGOn-Off"
+  
+  # tidy up Min column
   play_time_stats <- play_time_stats[-1, ] |>
     # tidy up Min column
     mutate(`Min` = if_else(
@@ -42,15 +48,14 @@ get_player_stats <- function(season = "2025-2026"){
     select(c(Player, Squad, MP, Min, `Mn/MP`, `Min%`, `90s`, `Starts`, `Mn/Start`, `Compl`,
              `Subs`, `Mn/Sub`)) |>
     # filter out NA mins
-    filter(!is.na(`Min`))
-  
-  # want to find and remove duplicates - will remove row from duplicates with least mins
-  # (for now)
-  play_time_stats_dupes |>
-    get_dupes(Player)
-  
-  
-  
+    filter(!is.na(`Min`)) |>
+    # sort by Min
+    arrange(desc(Min)) |>
+    # having arranged by Min, now use distinct on Player which will keep the row
+    # of any duplicate players that first appears in tibble (which will be the row
+    # where Min is largest)
+    distinct(Player, .keep_all = TRUE)
+
   # define url for standard stats
   standard_url <- paste0(
     "https://fbref.com/en/comps/9/", season, "/stats/", season, "-",
@@ -76,10 +81,27 @@ get_player_stats <- function(season = "2025-2026"){
   colnames(standard_stats)[-c(1:26, ncol(standard_stats))] <- paste0(
     colnames(standard_stats)[-c(1:26, ncol(standard_stats))], "90")
   
-  # remove first row that has been used for column headers
-  standard_stats <- standard_stats[-1, ]
+  # filter out rows where Player equals "Player"
+  standard_stats <- standard_stats |>
+    filter(Player != "Player")
   
-  # remove comma from mins
+  # tidy up Min column
+  standard_stats <- standard_stats |>
+    # tidy up Min column
+    mutate(`Min` = if_else(
+      # if Min contains a comma
+      grepl(",", `Min`),
+      # remove and convert to numeric
+      as.numeric(str_remove(`Min`, ",")),
+      # otherwise just convert to numeric
+      as.numeric(`Min`))) |>
+    # sort by Min
+    arrange(desc(Min)) |>
+    # having arranged by Min, now use distinct on Player which will keep the row
+    # of any duplicate players that first appears in tibble (which will be the row
+    # where Min is largest)
+    distinct(Player, .keep_all = TRUE)
+  
   standard_stats <- standard_stats |>
     # select columns we need
     select(c(Player, `G-PK90`, `Ast90`, `npxG90`, `xAG90`, `PK`, `PKatt`,
@@ -127,8 +149,19 @@ get_player_stats <- function(season = "2025-2026"){
     colnames(passing_stats)[20:22], "_long"
   )
   
-  # and remove first row that is used for column headers
-  passing_stats <- passing_stats[-1, ] |>
+  # filter out rows where Player equals "Player"
+  passing_stats <- passing_stats |>
+    filter(Player != "Player")
+  
+  passing_stats <- passing_stats |>
+    # sort by 90s, after converting to numeric
+    arrange(desc(as.numeric(`90s`))) |>
+    # having arranged by 90s, now use distinct on Player which will keep the row
+    # of any duplicate players that first appears in tibble (which will be the row
+    # where 90s is largest)
+    distinct(Player, .keep_all = TRUE)
+  
+  passing_stats <- passing_stats |>
     # select columns we care about
     select(c(`Player`, Cmp_tot, Att_tot, `xA`, `KP`))
   
@@ -155,8 +188,19 @@ get_player_stats <- function(season = "2025-2026"){
   colnames(def_act_stats)[9] <- "Tkl_player"
   colnames(def_act_stats)[14] <- "Tkl_dribbler"
   
-  # remove first row
-  def_act_stats <- def_act_stats[-1, ] |>
+  # filter out rows where Player equals "Player"
+  def_act_stats <- def_act_stats |>
+    filter(Player != "Player")
+  
+  def_act_stats <- def_act_stats |>
+    # sort by 90s as numeric
+    arrange(desc(as.numeric(`90s`))) |>
+    # having arranged by 90s, now use distinct on Player which will keep the row
+    # of any duplicate players that first appears in tibble (which will be the row
+    # where 90s is largest)
+    distinct(Player, .keep_all = TRUE)
+  
+  def_act_stats <- def_act_stats |>
     # and select columns we care about
     select(c(Player, Sh, `Tkl_player`, `Int`, `Clr`))
   
@@ -178,45 +222,47 @@ get_player_stats <- function(season = "2025-2026"){
   # now extract player misc stats
   misc_stats <- misc_tables[[3]]
   
-  # set first row to be column names, then remove first row
+  # set first row to be column names
   colnames(misc_stats) <- misc_stats[1, ]
-  misc_stats <- misc_stats[-1, ] |>
+  
+  # filter out rows where Player equals "Player"
+  misc_stats <- misc_stats |>
+    filter(Player != "Player")
+  
+  misc_stats <- misc_stats |>
+    # sort by 90s as numeric
+    arrange(desc(as.numeric(`90s`))) |>
+    # having arranged by 90s, now use distinct on Player which will keep the row
+    # of any duplicate players that first appears in tibble (which will be the row
+    # where 90s is largest)
+    distinct(Player, .keep_all = TRUE)
+  
+  misc_stats <- misc_stats |>
     # and select columns we want
     select(c(Player, Recov))
   
-  # define url for adv_gk stats
-  adv_gk_url <- paste0(
-    "https://fbref.com/en/comps/9/", season, "/keepersadv/", season, "-",
+  # define url for gk stats
+  gk_url <- paste0(
+    "https://fbref.com/en/comps/9/", season, "/keepers/", season, "-",
     "Premier-League-Stats"
   )
   
-  adv_gk_html <- read_html_live(adv_gk_url)
+  gk_html <- read_html_live(gk_url)
   
   # extract table element
-  adv_gk_tables <- adv_gk_html |>
+  gk_tables <- gk_html |>
     html_elements("table") |>
     html_table()
   
-  # now extract player adv_gk stats
-  adv_gk_stats <- adv_gk_tables[[3]]
-  colnames(adv_gk_stats) <- adv_gk_stats[1, ]
+  # now extract player gk stats
+  gk_stats <- gk_tables[[3]]
   
-  # edit column names so we don't have duplicates
-  colnames(adv_gk_stats)[18:20] <- paste0(
-    colnames(adv_gk_stats)[18:20], "_launched"
-  )
+  # make first row the column headers
+  colnames(gk_stats) <- gk_stats[1, ]
   
-  colnames(adv_gk_stats)[21:24] <- paste0(
-    colnames(adv_gk_stats)[21:24], "_passes"
-  )
-  
-  colnames(adv_gk_stats)[25:27] <- paste0(
-    colnames(adv_gk_stats)[25:27], "_goalkick"
-  )
-  
-  adv_gk_stats <- adv_gk_stats[-1, ] |>
-    # and drop columns we don't need - Rk, Nation, Pos, Squad, Age, Born, 90s
-    select(-c(Rk, `Nation`, Pos, Squad, Age, Born, `90s`))
+  gk_stats <- gk_stats |>
+    # and select columns we care about
+    select(c(Player, Saves))
   
   # define url for shot-creating action stats
   sca_url <- paste0(
@@ -247,8 +293,19 @@ get_player_stats <- function(season = "2025-2026"){
   colnames(sca_stats)[19:24] <- paste0(
     colnames(sca_stats)[19:24], "_gca")
   
-  # remove first row which is not needed
-  sca_stats <- sca_stats[-1, ] |>
+  # filter out rows where Player equals "Player"
+  sca_stats <- sca_stats |>
+    filter(Player != "Player")
+  
+  sca_stats <- sca_stats |>
+    # sort by 90s as numeric
+    arrange(desc(as.numeric(`90s`))) |>
+    # having arranged by 90s, now use distinct on Player which will keep the row
+    # of any duplicate players that first appears in tibble (which will be the row
+    # where 90s is largest)
+    distinct(Player, .keep_all = TRUE)
+  
+  sca_stats <- sca_stats |>
     # and select columns of interest
     select(c(Player, `SCA90`))
   
@@ -272,24 +329,53 @@ get_player_stats <- function(season = "2025-2026"){
   # make row 1 the column headers
   colnames(possess_stats) <- possess_stats[1, ]
   
-  # remove first row
-  possess_stats <- possess_stats[-1, ] |>
+  # filter out rows where Player equals "Player"
+  possess_stats <- possess_stats |>
+    filter(Player != "Player")
+  
+  possess_stats <- possess_stats |>
+    # sort by 90s as numeric
+    arrange(desc(as.numeric(`90s`))) |>
+    # having arranged by 90s, now use distinct on Player which will keep the row
+    # of any duplicate players that first appears in tibble (which will be the row
+    # where 90s is largest)
+    distinct(Player, .keep_all = TRUE)
+  
+  possess_stats <- possess_stats |>
     # and select columns of interest
     select(c(`Player`, `Succ`))
   
   # now join everything to play_time_stats
-  all_stats <- play_time_stats |> View()
-    #left_join(standard_stats, by = join_by(`Player` == `Player`)) #|> 
-    #left_join(passing_stats) |>
-    #left_join(def_act_stats) |>
-    #left_join(sca_stats) |>
-    
-    #left_join(possess_stats) |>
-    #left_join(misc_stats)# |>
-    #left_join(adv_gk_stats)
+  all_stats <- play_time_stats |>
+    left_join(standard_stats, by = join_by(`Player` == `Player`)) |> 
+    left_join(passing_stats, by = join_by(`Player` == `Player`)) |>
+    left_join(def_act_stats, by = join_by(`Player` == `Player`)) |>
+    left_join(sca_stats, by = join_by(`Player` == `Player`)) |>
+    left_join(possess_stats, by = join_by(`Player` == `Player`)) |>
+    left_join(misc_stats, by = join_by(`Player` == `Player`)) |>
+    left_join(gk_stats, by = join_by(`Player` == `Player`))
+  
+  # now define some new useful variables to have
+  all_stats <- all_stats |>
+    mutate(
+      # first convert all appropiate variables to numeric (i.e.,
+      # not Player and not Squad)
+      across(!c(Player, Squad), as.numeric),
+      
+      # defcon for defenders
+      `CBIT90` = (`Sh` + `Clr` +
+        `Tkl_player` + `Int`) / `90s`,
+      
+      # defcon for mids and attackers, so including recoveries
+      `CBIRT90` = `CBIT90` + Recov / `90s`,
+      
+      # Saves per 90
+      `Saves90` = Saves / `90s`
+    )
   
   return(all_stats)
   
 }
 
-get_player_stats(season = "2025-2026")
+player_stats_current <- get_player_stats(season = "2025-2026")
+View(player_stats_current)
