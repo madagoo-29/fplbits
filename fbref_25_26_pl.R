@@ -5,6 +5,10 @@ library(readxl)
 library(tidyverse)
 library(rvest)
 
+# write function that loads in all latest data and creates one tibble
+
+
+
 # define url for standard stats
 standard_25_26_url <- "https://fbref.com/en/comps/9/stats/Premier-League-Stats"
 
@@ -241,9 +245,4 @@ colnames(player_possession_25_26) <- player_possession_25_26[1, ]
 # remove first row
 player_possession_25_26 <- player_possession_25_26[-1, ]
 
-# get fbref league urls
-worldfootballR::fb_league_urls(country = "ENG", gender = "M", season_end_year = "2026")
-
-worldfootballR::fb_teams_urls("https://fbref.com/en/comps/9/Premier-League-Stats")
-
-# get fbref player urls from worldfootballR
+#############################

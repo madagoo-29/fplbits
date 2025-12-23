@@ -29,17 +29,17 @@ get_team_stats <- function(season = "2025-2026"){
     html_table()
   
   # now extract teams stats from standard
-  standard_stats <- standard_tables[[1]]
+  standard_stats_for <- standard_tables[[1]]
   
   # make first row the column headers
-  colnames(standard_stats) <- standard_stats[1, ]
+  colnames(standard_stats_for) <- standard_stats_for[1, ]
   
   # append "90" for per 90 stats
-  colnames(standard_stats)[-c(1:22)] <- paste0(
-    colnames(standard_stats)[-c(1:22)], "90")
+  colnames(standard_stats_for)[-c(1:22)] <- paste0(
+    colnames(standard_stats_for)[-c(1:22)], "90")
   
   # tidy up Min column
-  standard_stats <- standard_stats |>
+  standard_stats_for <- standard_stats_for |>
     # tidy up Min column
     mutate(`Min` = if_else(
       # if Min contains a comma
@@ -50,10 +50,43 @@ get_team_stats <- function(season = "2025-2026"){
       as.numeric(`Min`)))
   
   # remove first row
-  standard_stats <- standard_stats[-1, ] |>
+  standard_stats_for <- standard_stats_for[-1, ] |>
     # select columns we need
     select(c(Squad, `90s`, `Gls90`, `G-PK90`, `npxG90`, `PKatt`,
              `CrdY`, `CrdR`))
+  
+  # now extract teams stats from standard
+  standard_stats_against <- standard_tables[[2]]
+  
+  # make first row the column headers
+  colnames(standard_stats_against) <- standard_stats_against[1, ]
+  
+  # append "90" for per 90 stats
+  colnames(standard_stats_against)[-c(1:22)] <- paste0(
+    colnames(standard_stats_against)[-c(1:22)], "90")
+  
+  # tidy up Min column
+  standard_stats_against <- standard_stats_against |>
+    # tidy up Min column
+    mutate(`Min` = if_else(
+      # if Min contains a comma
+      grepl(",", `Min`),
+      # remove and convert to numeric
+      as.numeric(str_remove(`Min`, ",")),
+      # otherwise just convert to numeric
+      as.numeric(`Min`)))
+  
+  # remove first row
+  standard_stats_against <- standard_stats_against[-1, ] |>
+    # select columns we need
+    select(c(Squad, `G-PK90`, `npxG90`)) |>
+    # append _against onto all variables apart from squad
+    rename(`G-PK90_against` = `G-PK90`,
+           `npxG90_against` = `npxG90`) |>
+    # remove "vs " from Squad
+    mutate(
+      Squad = str_remove(Squad, "vs ")
+    )
   
   # load in passing stats
   # define url for passing stats
@@ -250,7 +283,8 @@ get_team_stats <- function(season = "2025-2026"){
     )
   
   # now join everything to play_time_stats
-  all_stats <- standard_stats |> 
+  all_stats <- standard_stats_for |> 
+    left_join(standard_stats_against, by = join_by(`Squad` == `Squad`)) |>
     left_join(passing_stats, by = join_by(`Squad` == `Squad`)) |>
     left_join(def_act_stats, by = join_by(`Squad` == `Squad`)) |>
     left_join(possess_stats_for, by = join_by(`Squad` == `Squad`)) |>

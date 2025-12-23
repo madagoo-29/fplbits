@@ -306,8 +306,21 @@ get_player_stats <- function(season = "2025-2026"){
     distinct(Player, .keep_all = TRUE)
   
   sca_stats <- sca_stats |>
+    # create SCA that excludes passing, create non-pass assists (similar-ish to fpl)
+    mutate(
+      # convert _sca and _gca variables to numeric
+      across(ends_with("_sca") | ends_with("_gca"), as.numeric),
+      # then sum those non-related to passing for sca
+      nonpassSCA = `TO_sca` + `Sh_sca` + `Fld_sca` + `Def_sca`,
+      # then get per 90
+      nonpassSCA_90 = nonpassSCA / as.numeric(`90s`),
+      # and equivalent for gca
+      nonpassGCA = `TO_gca` + `Sh_gca` + `Fld_gca` + `Def_gca`,
+      # then get per 90
+      nonpassGCA_90 = nonpassGCA / as.numeric(`90s`)
+    ) |>
     # and select columns of interest
-    select(c(Player, `SCA90`))
+    select(c(Player, `SCA90`, nonpassSCA_90, nonpassGCA_90))
   
   # define url for possession stats
   possess_url <- paste0(
@@ -379,3 +392,6 @@ get_player_stats <- function(season = "2025-2026"){
 
 player_stats_current <- get_player_stats(season = "2025-2026")
 View(player_stats_current)
+
+player_stats_24_25 <- get_player_stats(season = "2024-2025")
+View(player_stats_24_25)
